@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Outreach Plans{% endblock %}
+{% block page_title %}Outreach Plans{% endblock %}
+{% block page_sub %}All patient outreach plans — update status as contact is made{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-center gap-2 mb-3" style="justify-content:space-between;flex-wrap:wrap;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <select id="statusFilter" class="form-control" style="width:180px;" onchange="filterPlans()">
+      <option value="">All Statuses</option>
+      <option>Pending</option><option>Contacted</option><option>No Answer</option>
+      <option>Scheduled</option><option>Completed</option><option>Escalated</option>
+    </select>
+    <select id="methodFilter" class="form-control" style="width:160px;" onchange="filterPlans()">
+      <option value="">All Methods</option>
+      <option>Phone</option><option>SMS</option><option>Email</option><option>Home Visit</option>
+    </select>
+  </div>
+  <span class="text-muted text-sm">{{ plans|length }} outreach plans</span>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="outreachTable">
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Method</th>
+          <th>Next Step</th>
+          <th>Responsible</th>
+          <th>Follow-up</th>
+          <th>Status</th>
+          <th>AI Rationale</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in plans %}
+        {% set s = plan.status | lower | replace(' ', '') %}
+        <tr data-status="{{ plan.status }}" data-method="{{ plan.contact_method }}">
+          <td>
+            <a href="/patients/{{ plan.patient_id }}" style="font-weight:600;">{{ plan.patient.name }}</a>
+            <div class="text-muted text-sm">{{ plan.patient.condition }}</div>
+          </td>
+          <td>
+            <span>
+              {% if plan.contact_method == 'Phone' %}📞
+              {% elif plan.contact_method == 'SMS' %}💬
+              {% elif plan.contact_method == 'Email' %}📧
+              {% elif plan.contact_method == 'Home Visit' %}🏠
+              {% endif %}
+              {{ plan.contact_method }}
+            </span>
+          </td>
+          <td style="max-width:220px;">{{ plan.next_step }}</td>
+          <td class="text-muted">{{ plan.responsible_role }}</td>
+          <td class="text-muted">
+            {{ plan.follow_up_date }}
+          </td>
+          <td>
+            <span class="badge badge-{{ 'noanswer' if s=='noanswer' else s }}">{{ plan.status }}</span>
+          </td>
+          <td style="max-width:180px;font-size:11px;color:#1e40af;">
+            {% if plan.ai_rationale %}
+            <span title="{{ plan.ai_rationale }}">{{ plan.ai_rationale[:80] }}…</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              {% for st in ['Contacted','Scheduled','Completed','No Answer'] %}
+              {% if plan.status != st %}
+              <button class="btn btn-outline btn-xs"
+                onclick="updateStatus({{ plan.id }}, '{{ st }}', this)">
+                {{ st }}
+              </button>
+              {% endif %}
+              {% endfor %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterPlans(){
+  const status = document.getElementById('statusFilter').value;
+  const method = document.getElementById('methodFilter').value;
+  document.querySelectorAll('#outreachTable tbody tr').forEach(row => {
+    const sm = (!status || row.dataset.status === status);
+    const mm = (!method || row.dataset.method === method);
+    row.style.display = (sm && mm) ? '' : 'none';
+  });
+}
+
+async function updateStatus(planId, status, btn){
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const res = await fetch(`/api/outreach/${planId}/status`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status})
+    });
+    if(res.ok) location.reload();
+    else { btn.innerHTML = '❌'; btn.disabled = false; }
+  } catch(e){ btn.innerHTML = '❌'; btn.disabled = false; }
+}
+</script>
+{% endblock %}

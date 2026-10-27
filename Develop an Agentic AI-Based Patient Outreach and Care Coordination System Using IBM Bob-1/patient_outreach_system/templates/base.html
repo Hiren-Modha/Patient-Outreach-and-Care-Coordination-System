@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Patient Outreach System{% endblock %} — IBM Bob</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-title">🏥 Patient Outreach &amp;<br>Care Coordination</div>
+    <div class="brand-sub">Powered by IBM Bob · IBM Granite</div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+    <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}">
+      <span class="nav-icon">📊</span> Dashboard
+    </a>
+
+    <div class="nav-section-label">Patients</div>
+    <a href="/patients" class="nav-item {% if '/patients' in request.url.path %}active{% endif %}">
+      <span class="nav-icon">👥</span> Patient Register
+    </a>
+
+    <div class="nav-section-label">Coordination</div>
+    <a href="/outreach" class="nav-item {% if request.url.path == '/outreach' %}active{% endif %}">
+      <span class="nav-icon">📋</span> Outreach Plans
+    </a>
+    <a href="/escalations" class="nav-item {% if request.url.path == '/escalations' %}active{% endif %}">
+      <span class="nav-icon">🚨</span> Escalations
+    </a>
+    <a href="/reviews" class="nav-item {% if request.url.path == '/reviews' %}active{% endif %}">
+      <span class="nav-icon">✅</span> Human Reviews
+    </a>
+
+    <div class="nav-section-label">Analytics</div>
+    <a href="/reports" class="nav-item {% if request.url.path == '/reports' %}active{% endif %}">
+      <span class="nav-icon">📈</span> Reports
+    </a>
+
+    <div class="nav-section-label">API</div>
+    <a href="/docs" class="nav-item" target="_blank">
+      <span class="nav-icon">🔧</span> API Docs
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    &copy; 2025 IBM Bob · Synthetic Data Only<br>
+    Not for clinical use
+  </div>
+</nav>
+
+<!-- ── Main ────────────────────────────────────────────────────── -->
+<div class="main-wrap">
+  <header class="topbar">
+    <div>
+      <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+      <div class="topbar-sub">{% block page_sub %}Agentic AI Patient Outreach & Care Coordination System{% endblock %}</div>
+    </div>
+    <div class="topbar-right">
+      <span class="ibm-badge">🤖 IBM Granite AI</span>
+      <span class="badge badge-warning" style="background:#fdf6b2;color:#7c6b00;font-size:11px;padding:4px 10px;border-radius:99px;border:1px solid #fcd34d;">
+        ⚠ Synthetic Data Only
+      </span>
+    </div>
+  </header>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- ── Global JS ────────────────────────────────────────────────── -->
+<script src="/static/js/app.js"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Overview of patient risk, outreach status, and care coordination activity{% endblock %}
+
+{% block content %}
+
+<!-- ── Guardrail notice ──────────────────────────────────────────── -->
+<div class="alert alert-info mb-3">
+  <strong>🔒 Responsible AI Guardrail:</strong> This system uses synthetic data only.
+  All AI-generated risk rankings and outreach suggestions must be reviewed and approved by a
+  qualified healthcare professional before any clinical action is taken.
+</div>
+
+<!-- ── Risk Stat Tiles ──────────────────────────────────────────── -->
+<div class="stats-grid">
+  <div class="stat-tile primary">
+    <div class="stat-label">Total Patients</div>
+    <div class="stat-value">{{ total }}</div>
+    <div class="stat-sub">In care register</div>
+  </div>
+  <div class="stat-tile urgent">
+    <div class="stat-label">Urgent Risk</div>
+    <div class="stat-value">{{ urgent }}</div>
+    <div class="stat-sub">Immediate action required</div>
+  </div>
+  <div class="stat-tile high">
+    <div class="stat-label">High Risk</div>
+    <div class="stat-value">{{ high }}</div>
+    <div class="stat-sub">Priority outreach needed</div>
+  </div>
+  <div class="stat-tile medium">
+    <div class="stat-label">Medium Risk</div>
+    <div class="stat-value">{{ medium }}</div>
+    <div class="stat-sub">Monitor &amp; engage</div>
+  </div>
+  <div class="stat-tile low">
+    <div class="stat-label">Low Risk</div>
+    <div class="stat-value">{{ low }}</div>
+    <div class="stat-sub">Routine follow-up</div>
+  </div>
+  <div class="stat-tile urgent">
+    <div class="stat-label">Open Escalations</div>
+    <div class="stat-value">{{ open_escalations }}</div>
+    <div class="stat-sub">Require senior review</div>
+  </div>
+  <div class="stat-tile info">
+    <div class="stat-label">Pending Reviews</div>
+    <div class="stat-value">{{ pending_reviews }}</div>
+    <div class="stat-sub">Awaiting clinician sign-off</div>
+  </div>
+  <div class="stat-tile low">
+    <div class="stat-label">Completed Outreach</div>
+    <div class="stat-value">{{ outreach_stats.completed }}</div>
+    <div class="stat-sub">Successfully closed</div>
+  </div>
+</div>
+
+<!-- ── Two-column layout ─────────────────────────────────────────── -->
+<div class="grid-2">
+
+  <!-- Outreach Status Card -->
+  <div class="card">
+    <div class="card-header">
+      📋 Outreach Status Summary
+      <a href="/outreach" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="card-body">
+      {% set statuses = [
+        ('Completed', outreach_stats.completed, 'low'),
+        ('Scheduled', outreach_stats.scheduled, 'info'),
+        ('Contacted', outreach_stats.contacted, 'low'),
+        ('Pending',   outreach_stats.pending,   'medium'),
+        ('No Answer', outreach_stats.no_answer, 'high'),
+        ('Escalated', outreach_stats.escalated, 'urgent'),
+      ] %}
+      {% set total_outreach = outreach_stats.completed + outreach_stats.scheduled + outreach_stats.contacted + outreach_stats.pending + outreach_stats.no_answer + outreach_stats.escalated %}
+      {% for label, count, cls in statuses %}
+      <div class="mb-2">
+        <div class="d-flex align-center" style="justify-content:space-between;margin-bottom:3px;">
+          <span class="badge badge-{{ cls }}">{{ label }}</span>
+          <span class="text-sm text-muted fw-bold">{{ count }}</span>
+        </div>
+        <div class="progress">
+          <div class="progress-bar" style="width:{{ (count / total_outreach * 100) | int if total_outreach > 0 else 0 }}%;background:var(--{{ cls }});"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Recent Outreach Activity -->
+  <div class="card">
+    <div class="card-header">
+      🕐 Recent Outreach Activity
+      <a href="/outreach" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Method</th>
+            <th>Status</th>
+            <th>Follow-up</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for plan in recent_outreach %}
+          <tr>
+            <td>
+              <a href="/patients/{{ plan.patient_id }}">{{ plan.patient.name }}</a>
+            </td>
+            <td>{{ plan.contact_method }}</td>
+            <td>
+              {% set s = plan.status | lower | replace(' ', '') %}
+              <span class="badge badge-{{ 'noanswer' if s == 'noanswer' else s }}">{{ plan.status }}</span>
+            </td>
+            <td class="text-muted">{{ plan.follow_up_date }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Risk chart (inline SVG donut) ───────────────────────────── -->
+<div class="card mt-3">
+  <div class="card-header">📊 Patient Risk Distribution (AI-Reviewed)</div>
+  <div class="card-body">
+    <div id="risk-chart-wrap" style="display:flex;align-items:center;gap:40px;flex-wrap:wrap;">
+      <canvas id="riskDonut" width="200" height="200"></canvas>
+      <div id="risk-legend" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Simple donut chart drawn on Canvas
+const riskData = {
+  Urgent: {{ urgent }},
+  High:   {{ high }},
+  Medium: {{ medium }},
+  Low:    {{ low }},
+};
+const colours = { Urgent:'#e02424', High:'#ff5a1f', Medium:'#e3a008', Low:'#0e9f6e' };
+
+(function drawDonut(){
+  const canvas = document.getElementById('riskDonut');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 100, cy = 100, r = 80, ir = 52;
+  const total = Object.values(riskData).reduce((a,b)=>a+b,0) || 1;
+  let startAngle = -Math.PI/2;
+
+  for(const [label, val] of Object.entries(riskData)){
+    const sweep = (val/total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle+sweep);
+    ctx.closePath();
+    ctx.fillStyle = colours[label];
+    ctx.fill();
+    startAngle += sweep;
+  }
+  // Inner white circle (donut hole)
+  ctx.beginPath();
+  ctx.arc(cx,cy,ir,0,2*Math.PI);
+  ctx.fillStyle='#fff';
+  ctx.fill();
+  // Centre text
+  ctx.fillStyle='#111827';
+  ctx.font='bold 22px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(total, cx, cy+4);
+  ctx.font='11px sans-serif';
+  ctx.fillStyle='#6b7280';
+  ctx.fillText('Patients', cx, cy+18);
+
+  // Legend
+  const legend = document.getElementById('risk-legend');
+  for(const [label, val] of Object.entries(riskData)){
+    const pct = total ? Math.round(val/total*100) : 0;
+    legend.innerHTML += `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:12px;height:12px;border-radius:3px;background:${colours[label]};display:inline-block;flex-shrink:0"></span>
+        <span style="font-size:13px;"><strong>${label}</strong> — ${val} patient${val!==1?'s':''} (${pct}%)</span>
+      </div>`;
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Human Reviews{% endblock %}
+{% block page_title %}Human Review Workflow{% endblock %}
+{% block page_sub %}Clinician sign-off log — all AI-generated recommendations must be reviewed before action{% endblock %}
+
+{% block content %}
+
+<div class="alert alert-info mb-3">
+  <strong>🔒 Human-in-the-Loop Requirement:</strong> Every AI-generated outreach plan must be reviewed
+  and approved by an authorised healthcare professional. This page provides a full audit trail of all review decisions.
+</div>
+
+<div class="card">
+  <div class="card-header">
+    ✅ Review Records ({{ reviews|length }} total)
+    <div style="display:flex;gap:8px;">
+      <select id="statusFilter" class="form-control" style="width:200px;font-size:12px;" onchange="filterReviews()">
+        <option value="">All Decisions</option>
+        <option>Approved</option>
+        <option>Rejected</option>
+        <option>Flagged for Escalation</option>
+        <option>Pending Review</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="reviewTable">
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Reviewer</th>
+          <th>Decision</th>
+          <th>Clinical Comments</th>
+          <th>Approved Plan</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reviews %}
+        {% set rs = r.review_status | lower | replace(' ', '') %}
+        <tr data-status="{{ r.review_status }}">
+          <td>
+            <a href="/patients/{{ r.patient_id }}" style="font-weight:600;">{{ r.patient.name }}</a>
+            <div class="text-muted text-sm">{{ r.patient.condition }}</div>
+          </td>
+          <td class="fw-bold">{{ r.reviewer_name }}</td>
+          <td>
+            <span class="badge {{ 'badge-approved' if 'approved' in rs else 'badge-flagged' if 'flagged' in rs else 'badge-noanswer' if 'rejected' in rs else 'badge-review' }}">
+              {{ r.review_status }}
+            </span>
+          </td>
+          <td style="max-width:220px;font-size:12px;">{{ r.comments or '—' }}</td>
+          <td style="max-width:220px;font-size:12px;">{{ r.approved_plan or '—' }}</td>
+          <td class="text-muted text-sm">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not reviews %}
+    <div class="card-body text-muted text-sm">No review records yet. Reviews can be submitted from any patient detail page.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterReviews(){
+  const status = document.getElementById('statusFilter').value;
+  document.querySelectorAll('#reviewTable tbody tr').forEach(row => {
+    row.style.display = (!status || row.dataset.status === status) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

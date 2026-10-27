@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Escalations{% endblock %}
+{% block page_title %}Escalation Log{% endblock %}
+{% block page_sub %}Cases flagged by the Escalation Agent for senior clinician review{% endblock %}
+
+{% block content %}
+
+{% if open_escalations %}
+<div class="alert alert-danger mb-3">
+  <strong>🚨 {{ open_escalations|length }} open escalation{{ 's' if open_escalations|length > 1 else '' }} require immediate attention.</strong>
+  All escalated cases must be reviewed by an authorised healthcare professional before any action is taken.
+</div>
+{% endif %}
+
+<!-- ── Open Escalations ────────────────────────────────────────── -->
+<div class="card mb-3">
+  <div class="card-header">
+    🔴 Open Escalations
+    <span class="badge" style="background:#fde8e8;color:#c81e1e;">{{ open_escalations|length }}</span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if open_escalations %}
+    <table>
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Urgency</th>
+          <th>Reason</th>
+          <th>Assigned To</th>
+          <th>Date Raised</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for esc in open_escalations %}
+        <tr>
+          <td><a href="/patients/{{ esc.patient_id }}" style="font-weight:600;">{{ esc.patient.name }}</a></td>
+          <td><span class="badge badge-{{ 'urgent' if esc.urgency == 'Urgent' else 'medium' }}">{{ esc.urgency }}</span></td>
+          <td style="max-width:280px;">{{ esc.reason }}</td>
+          <td class="text-muted">{{ esc.assigned_to }}</td>
+          <td class="text-muted text-sm">{{ esc.created_at.strftime('%Y-%m-%d') if esc.created_at else '—' }}</td>
+          <td>
+            <button class="btn btn-success btn-sm" onclick="openResolve({{ esc.id }})">✅ Resolve</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="card-body text-muted">No open escalations. All cases are under control.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Resolved Escalations ───────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    ✅ Resolved Escalations
+    <span class="badge badge-low">{{ closed_escalations|length }}</span>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if closed_escalations %}
+    <table>
+      <thead>
+        <tr>
+          <th>Patient</th>
+          <th>Urgency</th>
+          <th>Reason</th>
+          <th>Resolution</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for esc in closed_escalations %}
+        <tr>
+          <td><a href="/patients/{{ esc.patient_id }}">{{ esc.patient.name }}</a></td>
+          <td><span class="badge badge-{{ 'urgent' if esc.urgency == 'Urgent' else 'medium' }}">{{ esc.urgency }}</span></td>
+          <td style="max-width:240px;font-size:12px;">{{ esc.reason[:100] }}…</td>
+          <td style="max-width:240px;font-size:12px;color:#065f46;">{{ esc.resolution or '—' }}</td>
+          <td class="text-muted text-sm">{{ esc.created_at.strftime('%Y-%m-%d') if esc.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="card-body text-muted text-sm">No resolved escalations yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Resolve Modal ───────────────────────────────────────────── -->
+<div class="modal-overlay" id="resolveModal">
+  <div class="modal">
+    <div class="modal-header">
+      ✅ Resolve Escalation
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info text-sm">
+        Document the actions taken and outcome before marking this escalation as resolved.
+      </div>
+      <div class="form-group">
+        <label>Resolution Notes</label>
+        <textarea id="resolution-text" class="form-control"
+          placeholder="Describe the clinical actions taken and outcome…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" onclick="submitResolve()">Mark Resolved</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentEscId = null;
+
+function openResolve(id){
+  currentEscId = id;
+  document.getElementById('resolution-text').value = '';
+  document.getElementById('resolveModal').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('resolveModal').classList.remove('open');
+}
+
+async function submitResolve(){
+  const resolution = document.getElementById('resolution-text').value.trim();
+  if(!resolution){ alert('Please enter resolution notes.'); return; }
+  try {
+    const res = await fetch(`/api/escalations/${currentEscId}/resolve?resolution=${encodeURIComponent(resolution)}`, {
+      method: 'PATCH'
+    });
+    if(res.ok){ closeModal(); location.reload(); }
+    else { alert('Failed to resolve escalation.'); }
+  } catch(e){ alert('Error.'); }
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target === el) el.classList.remove('open'); });
+});
+</script>
+{% endblock %}

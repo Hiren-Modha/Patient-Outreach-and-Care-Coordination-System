@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Patient Register{% endblock %}
+{% block page_title %}Patient Register{% endblock %}
+{% block page_sub %}All patients sorted by reviewed risk level — click a patient for full details and AI analysis{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-center gap-2 mb-3" style="justify-content:space-between;flex-wrap:wrap;">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <input id="search" class="form-control" style="width:220px;" placeholder="🔍 Search name or condition…" oninput="filterPatients()"/>
+    <select id="riskFilter" class="form-control" style="width:160px;" onchange="filterPatients()">
+      <option value="">All Risk Levels</option>
+      <option>Urgent</option><option>High</option><option>Medium</option><option>Low</option>
+    </select>
+  </div>
+  <span class="text-muted text-sm">{{ patients|length }} patients in register</span>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="patientTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Age</th>
+          <th>Condition</th>
+          <th>HbA1c</th>
+          <th>BP</th>
+          <th>Last Visit</th>
+          <th>AI Score</th>
+          <th>Risk Level</th>
+          <th>Language</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in patients %}
+        {% set rl = (p.reviewed_risk_level or 'Low') | lower %}
+        <tr data-name="{{ p.name|lower }}" data-condition="{{ p.condition|lower }}" data-risk="{{ p.reviewed_risk_level }}">
+          <td class="text-muted">{{ loop.index }}</td>
+          <td>
+            <a href="/patients/{{ p.id }}" style="font-weight:600;">{{ p.name }}</a>
+            {% if p.missing_data_flags and p.missing_data_flags != '[]' %}
+            <span title="Missing data" style="color:#e3a008;margin-left:4px;">⚠</span>
+            {% endif %}
+          </td>
+          <td>{{ p.age }}</td>
+          <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ p.condition }}">{{ p.condition }}</td>
+          <td>
+            <span style="font-weight:700;color:{{'#e02424' if p.hba1c >= 9.0 else '#e3a008' if p.hba1c >= 7.5 else '#0e9f6e'}}">
+              {{ p.hba1c }}%
+            </span>
+          </td>
+          <td>{{ p.blood_pressure }}</td>
+          <td class="text-muted">{{ p.last_visit }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div class="progress" style="width:50px;">
+                <div class="progress-bar" style="width:{{ p.ai_risk_score | int }}%;background:{{'#e02424' if p.ai_risk_score>=80 else '#ff5a1f' if p.ai_risk_score>=60 else '#e3a008' if p.ai_risk_score>=40 else '#0e9f6e'}};"></div>
+              </div>
+              <span style="font-size:12px;">{{ p.ai_risk_score }}</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-{{ rl }}">{{ p.reviewed_risk_level or 'Low' }}</span>
+            {% if p.reviewed_risk_level != p.ai_risk_level %}
+            <span title="Reviewed — AI said {{ p.ai_risk_level }}" style="font-size:11px;color:var(--muted);margin-left:3px;">(AI: {{ p.ai_risk_level }})</span>
+            {% endif %}
+          </td>
+          <td>{{ p.language }}</td>
+          <td>
+            <a href="/patients/{{ p.id }}" class="btn btn-outline btn-xs">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterPatients(){
+  const q    = document.getElementById('search').value.toLowerCase();
+  const risk = document.getElementById('riskFilter').value;
+  document.querySelectorAll('#patientTable tbody tr').forEach(row => {
+    const nameMatch = row.dataset.name.includes(q) || row.dataset.condition.includes(q);
+    const riskMatch = !risk || row.dataset.risk === risk;
+    row.style.display = (nameMatch && riskMatch) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
